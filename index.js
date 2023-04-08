@@ -1,14 +1,14 @@
 require('dotenv').config();
 const axios = require('axios');
-const { Client, MessageEmbed, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { Client, MessageEmbed, Intents, MessageActionRow, MessageButton, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 
 const client = new Client({
   intents: [
-      GatewayIntentBits.Guilds,
-      // ...
-  ]
+    GatewayIntentBits.Guilds,
+    // ...
+]
 })
 
 client.once('ready', () => {
@@ -48,63 +48,59 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.editReply({ content: `No results found for "${query}".`, ephemeral: false });
     } else {
       const embed = new EmbedBuilder()
-        .setColor('#0099ff')
+        .setColor('#00ffbb')
         .setTitle(`Tourist attractions in ${query}`)
         .setDescription(result)
         .setTimestamp();
       
       const msg = await interaction.editReply({content: "", embeds: [embed], ephemeral: false });
-      await msg.react('1️⃣');
-      await msg.react('2️⃣');
-      await msg.react('3️⃣');
-      await msg.react('4️⃣');
-      await msg.react('5️⃣');
+      await msg.react('⬅️');
+      await msg.react('➡️');
       await msg.react('🔄');
+      
+      const reactions = ['⬅️', '➡️', '🔄'];
+
+      const filter = (reaction, user) => {
+        return reactions.includes(reaction.emoji.name) && user.id !== client.user.id;
+      };
+
+      const collector = msg.createReactionCollector({ filter, time: 5000 });
+
+      collector.on('collect', async (reaction, user) => {
+        if (reaction.emoji.name === '➡️') {
+          await reaction.users.remove(user.id);
+          await msg.reactions.cache.find(r => r.emoji.name === '➡️').users.remove(user.id);
+          await msg.reactions.cache.find(r => r.emoji.name === '⬅️').users.remove(user.id);
+          await msg.reactions.cache.find(r => r.emoji.name === '🔄').users.remove(user.id);
+
+          const attractionNumber = parseInt(result.split('\n').find(line => line.startsWith('1.'))?.charAt(0));
+          if (!attractionNumber) {
+            await interaction.followUp({ content: "Sorry, I couldn't find any attractions to show more information about.", ephemeral: false });
+            return;
+          }
+
+          const attractions = result.split(`${attractionNumber}. `);
+          if (attractions.length < 2) {
+            await interaction.followUp({ content: "Sorry, I couldn't find any attractions to show more information about.", ephemeral: false });
+            return;
+          }
+
+          const attractionDescription = attractions[1].split(/^[0-9]+\./)[0].trim();
+          const attractionEmbed = new EmbedBuilder()
+
+          .setColor('#00ffbb')
+          .setTitle(`${attractionNumber}. ${attractions[0]}`)
+          .setDescription(attractionDescription)
+          .setTimestamp();
+
+          await interaction.followUp({ content: "Here's more information about the attraction:", embeds: [attractionEmbed], ephemeral: false });
+        }
+      });
+    
+      collector.on('end', async (collected) => {
+        await interaction.followUp({ content: 'No more reactions will be collected.', ephemeral: false });
+      });
     }
-  }
-});
-
-client.on('ready', async () => {
-  const guildId = process.env.GUILD_ID;
-  const clientId = process.env.CLIENT_ID;
-  const clientSecret = process.env.CLIENT_SECRET;
-  const botToken = process.env.BOT_TOKEN;
-  const apiToken = process.env.API_TOKEN;;
-
-  const guild = client.guilds.cache.get(guildId);
-  if (!guild) {
-    console.log(`Unable to fetch guild with ID ${guildId}`);
-    return;
-  }
-
-  const commands = [
-    {
-      name: 'search',
-      description: 'Search for tourist attractions in a specific location',
-      options: [
-        {
-          name: 'query',
-          type: 'STRING',
-          description: 'The location to search for',
-          required: true,
-        },
-      ],
-    },
-  ];
-
-  const rest = new REST({ version: '9' }).setToken(botToken);
-
-  try {
-    console.log('Started refreshing application (/) commands.');
-
-    await rest.put(
-      Routes.applicationGuildCommands(clientId, guildId),
-      { body: commands }
-    );
-
-    console.log('Successfully reloaded application (/) commands.');
-  } catch (error) {
-    console.error(error);
   }
 });
 
