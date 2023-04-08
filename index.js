@@ -53,7 +53,13 @@ client.on('interactionCreate', async (interaction) => {
         .setDescription(result)
         .setTimestamp();
       
-      await interaction.editReply({content: "", embeds: [embed], ephemeral: false });
+      const msg = await interaction.editReply({content: "", embeds: [embed], ephemeral: false });
+      await msg.react('1️⃣');
+      await msg.react('2️⃣');
+      await msg.react('3️⃣');
+      await msg.react('4️⃣');
+      await msg.react('5️⃣');
+      await msg.react('🔄');
     }
   }
 });
